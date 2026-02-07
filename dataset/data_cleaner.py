@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -27,7 +28,9 @@ def clean_dataset():
         'review_scores_accuracy', 'review_scores_cleanliness', 
         'review_scores_checkin', 'review_scores_communication',
         'calculated_host_listings_count', 'calculated_host_listings_count_entire_homes', 
-        'calculated_host_listings_count_private_rooms', 'calculated_host_listings_count_shared_rooms'
+        'calculated_host_listings_count_private_rooms', 'calculated_host_listings_count_shared_rooms',
+        'first_review', 'minimum_nights', 'maximum_nights',
+        'neighbourhood_cleansed'
     ]
     df_cleaned = df.drop(columns=columns_to_drop, errors='ignore')
 
@@ -38,13 +41,72 @@ def clean_dataset():
         
         df_cleaned = df_cleaned.dropna(subset=['price'])
 
+    # Gestione Amenities (Top 50)
+    if 'amenities' in df_cleaned.columns:
+        # Rimuove parentesi e virgolette
+        df_cleaned['amenities'] = df_cleaned['amenities'].fillna('').astype(str).str.replace(r'[\[\]{}"]', '', regex=True)
+        # Tokenizer custom: splitta per virgola e rimuove spazi bianchi
+        vectorizer = CountVectorizer(tokenizer=lambda x: [item.strip() for item in x.split(',') if item.strip()], max_features=50)
+        amenities_matrix = vectorizer.fit_transform(df_cleaned['amenities'])
+        amenities_df = pd.DataFrame(amenities_matrix.toarray(), columns=vectorizer.get_feature_names_out(), index=df_cleaned.index)
+        df_cleaned = pd.concat([df_cleaned.drop(columns=['amenities']), amenities_df], axis=1)
+
+    # Gestione last_review
+    if 'last_review' in df_cleaned.columns:
+        df_cleaned['last_review'] = pd.to_datetime(df_cleaned['last_review'], errors='coerce')
+        ref_date = df_cleaned['last_review'].max()
+        df_cleaned['days_since_last_review'] = (ref_date - df_cleaned['last_review']).dt.days
+        df_cleaned = df_cleaned.drop(columns=['last_review'])
+        # Imputazione dei valori mancanti in days_since_last_review con la mediana
+        df_cleaned['days_since_last_review'] = df_cleaned['days_since_last_review'].fillna(df_cleaned['days_since_last_review'].median())
+
+    # Gestione host_response_rate e host_acceptance_rate
+    rate_cols = ['host_response_rate', 'host_acceptance_rate']
+    for col in rate_cols:
+        if col in df_cleaned.columns:
+            # Rimuove % e converte in numerico
+            df_cleaned[col] = df_cleaned[col].astype(str).str.replace('%', '', regex=False)
+            df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors='coerce')
+            
+            # Imputazione con la mediana
+            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+            
+            # Binning
+            bins = [0, 20, 40, 60, 80, 100]
+            labels = ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%']
+            df_cleaned[col] = pd.cut(df_cleaned[col], bins=bins, labels=labels, include_lowest=True)
+            
+            # Convertire in stringa per assicurare corretta gestione come categorica
+            df_cleaned[col] = df_cleaned[col].astype(str)
+
+    # Imputazione Dati Mancanti
+    
+    # Variabili Categoriche: Moda
+    cat_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in cat_cols:
+        if not df_cleaned[col].mode().empty:
+            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0])
+
+    # Variabili Numeriche: Mediana (tranne reviews_per_month)
+    num_cols = df_cleaned.select_dtypes(include=['float64', 'int64']).columns
+    for col in num_cols:
+        if col == 'price':
+            continue 
+            
+        if col in ['reviews_per_month', 'review_scores_rating', 'review_scores_location']:
+             df_cleaned[col] = df_cleaned[col].fillna(0)
+        else:
+             df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+
+    # One-Hot Encoding per tutte le variabili rimaste
+    df_encoded = pd.get_dummies(df_cleaned, drop_first=True, dtype=int)
 
     # Divisione Train/Test
-    train_df, test_df = train_test_split(df_cleaned, test_size=0.2, random_state=42)
+    train_df, test_df = train_test_split(df_encoded, test_size=0.2, random_state=42)
              
     # Salvataggio
     files_map = {
-        output_path: df_cleaned,
+        output_path: df_encoded,
         train_output_path: train_df,
         test_output_path: test_df
     }
