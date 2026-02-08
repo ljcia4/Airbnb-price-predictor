@@ -30,7 +30,7 @@ def clean_dataset():
         'calculated_host_listings_count', 'calculated_host_listings_count_entire_homes', 
         'calculated_host_listings_count_private_rooms', 'calculated_host_listings_count_shared_rooms',
         'first_review', 'minimum_nights', 'maximum_nights',
-        'neighbourhood_cleansed'
+        'neighbourhood_cleansed','amenities'
     ]
     df_cleaned = df.drop(columns=columns_to_drop, errors='ignore')
 
@@ -40,16 +40,6 @@ def clean_dataset():
         df_cleaned['price'] = pd.to_numeric(df_cleaned['price'], errors='coerce')
         
         df_cleaned = df_cleaned.dropna(subset=['price'])
-
-    # Gestione Amenities (Top 50)
-    if 'amenities' in df_cleaned.columns:
-        # Rimuove parentesi e virgolette
-        df_cleaned['amenities'] = df_cleaned['amenities'].fillna('').astype(str).str.replace(r'[\[\]{}"]', '', regex=True)
-        # Tokenizer custom: splitta per virgola e rimuove spazi bianchi
-        vectorizer = CountVectorizer(tokenizer=lambda x: [item.strip() for item in x.split(',') if item.strip()], max_features=50)
-        amenities_matrix = vectorizer.fit_transform(df_cleaned['amenities'])
-        amenities_df = pd.DataFrame(amenities_matrix.toarray(), columns=vectorizer.get_feature_names_out(), index=df_cleaned.index)
-        df_cleaned = pd.concat([df_cleaned.drop(columns=['amenities']), amenities_df], axis=1)
 
     # Gestione last_review
     if 'last_review' in df_cleaned.columns:
