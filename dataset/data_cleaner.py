@@ -30,7 +30,7 @@ def clean_dataset():
         'calculated_host_listings_count', 'calculated_host_listings_count_entire_homes', 
         'calculated_host_listings_count_private_rooms', 'calculated_host_listings_count_shared_rooms',
         'first_review', 'minimum_nights', 'maximum_nights',
-        'neighbourhood_cleansed','amenities'
+        'neighbourhood_cleansed','amenities', 'host_response_rate', 'host_acceptance_rate', 'host_response_time', 'host_has_profile_pic'
     ]
     df_cleaned = df.drop(columns=columns_to_drop, errors='ignore')
 
@@ -49,25 +49,6 @@ def clean_dataset():
         df_cleaned = df_cleaned.drop(columns=['last_review'])
         # Imputazione dei valori mancanti in days_since_last_review con la mediana
         df_cleaned['days_since_last_review'] = df_cleaned['days_since_last_review'].fillna(df_cleaned['days_since_last_review'].median())
-
-    # Gestione host_response_rate e host_acceptance_rate
-    rate_cols = ['host_response_rate', 'host_acceptance_rate']
-    for col in rate_cols:
-        if col in df_cleaned.columns:
-            # Rimuove % e converte in numerico
-            df_cleaned[col] = df_cleaned[col].astype(str).str.replace('%', '', regex=False)
-            df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors='coerce')
-            
-            # Imputazione con la mediana
-            df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
-            
-            # Binning
-            bins = [0, 20, 40, 60, 80, 100]
-            labels = ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%']
-            df_cleaned[col] = pd.cut(df_cleaned[col], bins=bins, labels=labels, include_lowest=True)
-            
-            # Convertire in stringa per assicurare corretta gestione come categorica
-            df_cleaned[col] = df_cleaned[col].astype(str)
 
     # Imputazione Dati Mancanti
     
