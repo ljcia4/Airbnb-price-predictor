@@ -41,6 +41,9 @@ def clean_dataset():
         
         df_cleaned = df_cleaned.dropna(subset=['price'])
 
+        # Rimozione outlier prezzo > 600
+        df_cleaned = df_cleaned[df_cleaned['price'] <= 600]
+
     # Gestione last_review
     if 'last_review' in df_cleaned.columns:
         df_cleaned['last_review'] = pd.to_datetime(df_cleaned['last_review'], errors='coerce')
