@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
@@ -52,6 +53,29 @@ def clean_dataset():
         df_cleaned = df_cleaned.drop(columns=['last_review'])
         # Imputazione dei valori mancanti in days_since_last_review con la mediana
         df_cleaned['days_since_last_review'] = df_cleaned['days_since_last_review'].fillna(df_cleaned['days_since_last_review'].median())
+
+    # Calcolo distanza dal centro (Piazza Plebiscito)
+    if 'latitude' in df_cleaned.columns and 'longitude' in df_cleaned.columns:
+        center_lat = 40.8358256
+        center_lon = 14.2485831
+        
+        df_cleaned['latitude'] = pd.to_numeric(df_cleaned['latitude'], errors='coerce')
+        df_cleaned['longitude'] = pd.to_numeric(df_cleaned['longitude'], errors='coerce')
+        
+        # Formula di Haversine vettorizzata
+        R = 6371  # Raggio della Terra in km
+        phi1 = np.radians(df_cleaned['latitude'])
+        phi2 = np.radians(center_lat)
+        dphi = np.radians(center_lat - df_cleaned['latitude'])
+        dlambda = np.radians(center_lon - df_cleaned['longitude'])
+        
+        a = np.sin(dphi/2)**2 + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda/2)**2
+        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+        
+        df_cleaned['distance_from_center'] = R * c
+        
+        # Rimuove le colonne originali
+        df_cleaned = df_cleaned.drop(columns=['latitude', 'longitude'])
 
     # Imputazione Dati Mancanti
     
